@@ -45,8 +45,8 @@ class PPO(object):
 
 		self.ac_optimizer = optim.Adam(self.ac_net.parameters(), lr=lr)
 		self.scheduler = optim.lr_scheduler.StepLR(self.ac_optimizer, step_size=5, gamma=0.999)
-		if not os.path.exists('./result'):
-			os.makedirs('./result')
+		if not os.path.exists('result'):
+			os.makedirs('result')
 
 		self.use_GAE = use_GAE
 
@@ -71,15 +71,15 @@ class PPO(object):
 
 	def get_gaes(self, rewards, v_preds, v_preds_next, dones):
 		deltas = [r_t + self.gamma * (1 - done) * v_next - v for r_t, v_next, v, done in zip(rewards, v_preds_next,
-																							 v_preds, dones)]
+                                                                                             v_preds, dones)]
 		advantages = []
 		adv = 0.0
-		for d in deltas[::-1]:
-			adv = self.gae_lambda * self.gamma * adv + d
+		for i in reversed(range(len(deltas))):
+			adv = self.gae_lambda * self.gamma * adv * (1-dones[i]) + deltas[i]
 			advantages.append(adv)
 		advantages.reverse()
-		adv=torch.tensor(advantages, dtype=torch.float32)
-		returns=adv+v_preds
+		adv = torch.tensor(advantages, dtype=torch.float32)
+		returns = adv + v_preds
 		return adv, returns
 
 	def dis_rewards(self, rewards, dones, next_state):
@@ -104,16 +104,15 @@ class PPO(object):
 		with torch.no_grad():
 			if not self.use_GAE:
 				Gt = self.dis_rewards(reward, done, next_state)
-				# optional
-				# Gt = (Gt - Gt.mean()) / (Gt.std() + 1e-8)
 				adv = Gt - torch.squeeze(self.ac_net.critic(state))
 			else:
 				# Gt = self.dis_rewards(reward, done, next_state)
 				v = self.ac_net.critic(state)
 				next_v = self.ac_net.critic(next_state)
 				adv, Gt = self.get_gaes(reward, torch.squeeze(v), torch.squeeze(next_v), done)
-				# normalize is optional
-				# adv = (adv - adv.mean()) / (adv.std() + 1e-8)
+
+			# normalize is optional
+			adv = (adv - adv.mean()) / (adv.std() + 1e-8)
 
 		for i in range(50):
 			V, action_log_prob, dist_entropy, action_prob = self.evaluate(state, action)

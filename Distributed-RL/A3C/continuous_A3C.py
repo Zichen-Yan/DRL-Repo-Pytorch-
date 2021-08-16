@@ -1,10 +1,3 @@
-"""
-Reinforcement Learning (A3C) using Pytroch + multiprocessing.
-The most simple implementation for continuous action.
-
-View more on my Chinese tutorial page [莫烦Python](https://morvanzhou.github.io/).
-"""
-
 import torch
 import torch.nn as nn
 from utils import v_wrap, set_init, push_and_pull, record
@@ -50,7 +43,7 @@ class Net(nn.Module):
         self.training = False
         mu, sigma, _ = self.forward(s)
         m = self.distribution(mu.view(1, ).data, sigma.view(1, ).data)
-        return m.sample().numpy()
+        return m.sample().numpy().flatten()
 
     def loss_func(self, s, a, v_t):
         self.train()
@@ -86,7 +79,7 @@ class Worker(mp.Process):
                 if self.name == 'w0':
                     self.env.render()
                 a = self.lnet.choose_action(v_wrap(s[None, :]))
-                s_, r, done, _ = self.env.step(a.clip(-2, 2))
+                s_, r, done, _ = self.env.step(a)
                 if t == MAX_EP_STEP - 1:
                     done = True
                 ep_r += r

@@ -67,8 +67,8 @@ class PPO(object):
 
         self.actor_optimizer = optim.Adam(self.actor_net.parameters(), lr=a_lr)
         self.critic_optimizer = optim.Adam(self.critic_net.parameters(), lr=c_lr)
-        if not os.path.exists('./result'):
-            os.makedirs('./result')
+        if not os.path.exists('result'):
+            os.makedirs('result')
 
     def action(self, state):
         state = torch.from_numpy(state).float().view(1, -1)
@@ -92,8 +92,8 @@ class PPO(object):
                                                                                              v_preds, dones)]
         advantages = []
         adv = 0.0
-        for d in deltas[::-1]:
-            adv = self.gae_lambda * self.gamma * adv + d
+        for i in reversed(range(len(deltas))):
+            adv = self.gae_lambda * self.gamma * adv * (1 - dones[i]) + deltas[i]
             advantages.append(adv)
         advantages.reverse()
         adv = torch.tensor(advantages, dtype=torch.float32)
@@ -120,7 +120,7 @@ class PPO(object):
         old_action_log_prob = torch.tensor([t.a_log_prob for t in self.buffer], dtype=torch.float).detach()
 
         #-----------------------------------------
-        # A=r+gamma*v_-v  GAE gae_lambda=1
+        # A=r+gamma*v_-v  GAE gae_lambda=0
         # pred_v = self.critic_net(state).flatten()
         # pred_v_ = self.critic_net(next_state).flatten()
         # with torch.no_grad():
@@ -131,18 +131,16 @@ class PPO(object):
 
         # -----------------------------------------
         with torch.no_grad():
-            if not self.use_GAE: # A=Gt-V GAE gae_lambda=0
+            if not self.use_GAE: # A=Gt-V GAE gae_lambda=1
                 Gt = self.dis_rewards(reward, done, next_state)
-                # optional
-                # Gt = (Gt - Gt.mean()) / (Gt.std() + 1e-8)
                 adv = Gt - torch.squeeze(self.critic_net(state))
-            else: # GAE gae_lambda=0.95
-                Gt = self.dis_rewards(reward, done, next_state)
+            else:  # GAE gae_lambda=0.95
+                # Gt = self.dis_rewards(reward, done, next_state)
                 v = self.critic_net(state)
                 next_v = self.critic_net(next_state)
                 adv, Gt = self.get_gaes(reward, torch.squeeze(v), torch.squeeze(next_v), done)
-                # normalize is optional
-                # adv = (adv - adv.mean()) / (adv.std() + 1e-8)
+            # normalize is optional
+            adv = (adv - adv.mean()) / (adv.std() + 1e-8)
             adv = adv.view(-1, 1)
 
         for i in range(10):
@@ -169,8 +167,8 @@ class PPO(object):
         del self.buffer[:]  # clear experience
 
     def save_param(self):
-        torch.save(self.actor_net.state_dict(), './result/actor_net_params.pkl')
-        torch.save(self.critic_net.state_dict(), './result/critic_net_params.pkl')
+        torch.save(self.actor_net.state_dict(), 'result/actor_net_params.pkl')
+        torch.save(self.critic_net.state_dict(), 'result/critic_net_params.pkl')
 
     def load_params(self):
         self.actor_net.load_state_dict(torch.load('./result/actor_net_params.pkl'))

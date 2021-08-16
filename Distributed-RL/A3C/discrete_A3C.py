@@ -1,10 +1,3 @@
-"""
-Reinforcement Learning (A3C) using Pytroch + multiprocessing.
-The most simple implementation for continuous action.
-
-View more on my Chinese tutorial page [莫烦Python](https://morvanzhou.github.io/).
-"""
-
 import torch
 import torch.nn as nn
 from utils import v_wrap, set_init, push_and_pull, record
